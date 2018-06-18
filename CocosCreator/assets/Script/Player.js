@@ -22,13 +22,15 @@ cc.Class({
         this.timer = 0;
     },
 
-    // LIFE-CYCLE CALLBACKS:
-
-    start () {
+    setName(name) {
+        this.playerName.string = name;
     },
 
+    // LIFE-CYCLE CALLBACKS:
+    // start () {},
+
     update (dt) {
-        if(!this.node.position.equals(this.destination)) {
+        if(this.destination && !this.node.position.equals(this.destination)) {
             this.timer += dt;
             if(this.timer > this.MAX_TIME){
                 this.timer = this.MAX_TIME;

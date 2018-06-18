@@ -19,34 +19,40 @@ cc.Class({
     initializeInputHandler(){
         this.node.on(cc.Node.EventType.TOUCH_START, this.onTouchBegan.bind(this));
     },
+    initializeRoom(){
+        this.client = new Colyseus.Client("wss:mygameserver4test.herokuapp.com");
+        this.room = this.client.join("testColyseus");
+
+        this.room.listen("players/:id/:position", (function(change) {
+            cc.log("position",change);
+            let id = change.path.id;
+            if(change.operation.includes("add")) {
+                if(!this.players[id]) {
+                    this.players[id] = cc.instantiate(this.playerPrefab).getComponent("Player");
+                    this.players[id].node.setParent(this.node);
+                    this.players[id].setDestination(JSON.parse(change.value));
+                    this.players[id].setName(id);
+                }
+            }else{
+                if(this.players[id]){
+                    this.players[id].setDestination(JSON.parse(change.value));
+                }
+            }
+        }).bind(this));
+    },
 
     onTouchBegan(event){
         let pos = this.node.convertToNodeSpace(event.touch.getLocation());
-        cc.log(pos);
-        this.curPlayer.setDestination(pos);
+        this.room.send(pos);
     },
-
-    onTouchMoved(){
-
-    },
-
-    onTouchEnded(){
-
-    },
-
     // LIFE-CYCLE CALLBACKS:
-
     onLoad () {
-        this.players = [];
-        this.curPlayer = cc.instantiate(this.playerPrefab).getComponent("Player");
-        this.curPlayer.node.setParent(this.node);
-        // this.node.attach(this.curPlayer.node);
-        this.players.push(this.curPlayer);
+        this.players = {};
         this.initializeInputHandler();
+        this.initializeRoom();
     },
 
     start () {
-        this.curPlayer.setDestination(new cc.Vec2(100, 100));
     },
 
     // update (dt) {},
