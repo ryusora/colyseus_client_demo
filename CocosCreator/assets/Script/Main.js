@@ -17,28 +17,46 @@ cc.Class({
 
     // Input handler
     initializeInputHandler(){
+        cc.log("initialize Input Handler");
         this.node.on(cc.Node.EventType.TOUCH_START, this.onTouchBegan.bind(this));
     },
+    initializeLobbyRoom(){
+        let lobbyRoom = this.client.join("lobby", {contextID: this.roomID});
+        lobbyRoom.onMessage.add(function(message) {
+            if(message.roomReady) {
+                lobbyRoom.leave(); // force player leave lobby
+                this.initializeRoom();
+                this.initializeInputHandler();
+            }
+        }.bind(this));
+    },
+    getPlayerAt(id){
+        if(!this.players[id]) {
+            this.players[id] = cc.instantiate(this.playerPrefab).getComponent("Player");
+            this.players[id].node.setParent(this.node);
+        }
+        return this.players[id];
+    },
     initializeRoom(){
-        this.client = new Colyseus.Client("wss:mygameserver4test.herokuapp.com");
-        this.room = this.client.join("testColyseus");
-
-        this.room.listen("players/:id/:position", (function(change) {
+        cc.log("initialize Context Room : " + this.roomID);
+        this.room = this.client.join(this.roomID, {playerID: FBInstant.player.getID()});
+        
+        this.room.listen("players/:id/:attribute", (function(change) {
             cc.log("position",change);
             let id = change.path.id;
-            if(change.operation.includes("add")) {
-                if(!this.players[id]) {
-                    this.players[id] = cc.instantiate(this.playerPrefab).getComponent("Player");
-                    this.players[id].node.setParent(this.node);
-                    this.players[id].setDestination(JSON.parse(change.value));
-                    this.players[id].setName(id);
-                }
-            }else{
-                if(this.players[id]){
-                    this.players[id].setDestination(JSON.parse(change.value));
-                }
-            }
+            let player = this.getPlayerAt(id);
+            
+            if(change.path.attribute == "position")
+                player.setDestination(JSON.parse(change.value));
+            else if(change.path.attribute == "name")
+                player.setName(change.value)
         }).bind(this));
+
+        this.room.onJoin.add(function(client){
+            cc.log("new client has join");
+            this.room.send({name: FBInstant.player.getName()});
+        }.bind(this));
+        
     },
 
     onTouchBegan(event){
@@ -47,9 +65,10 @@ cc.Class({
     },
     // LIFE-CYCLE CALLBACKS:
     onLoad () {
+        this.client = new Colyseus.Client("wss:mygameserver4test.herokuapp.com");
         this.players = {};
-        this.initializeInputHandler();
-        this.initializeRoom();
+        this.roomID = FBInstant.context.getID() || FBInstant.player.getID();
+        this.initializeLobbyRoom();
     },
 
     start () {
